@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./Registry.sol";
 
@@ -11,9 +12,11 @@ interface IRegistry {
 }
 
 // ETH - ERC20 Token Exchange
-contract Exchange is ERC20 {
+contract Exchange is ERC20, Ownable {
     address public tokenAddress;
     address public registryAddress; // registry / factory
+
+    uint256 public fee;
 
     event TokenPurchase(
         address indexed buyer,
@@ -35,11 +38,21 @@ contract Exchange is ERC20 {
         uint256 indexed ethRemoved,
         uint256 indexed tokensRemoved
     );
+    event FeeUpdate(uint256 indexed previousFee, uint256 indexed newFee);
 
-    constructor(address _tokenAddress) ERC20("AMM Liquidity Provider", "LP") {
+    constructor(address _tokenAddress, uint256 _fee)
+        ERC20("AMM Liquidity Provider", "LP")
+    {
         require(_tokenAddress != address(0), "Invalid token address");
         tokenAddress = _tokenAddress;
         registryAddress = msg.sender;
+        fee = _fee;
+    }
+
+    function updateFee(uint256 _newFee) public onlyOwner {
+        uint256 previousFee = fee;
+        fee = _newFee;
+        emit FeeUpdate(previousFee, _newFee);
     }
 
     function tokenReserve() public view returns (uint256) {
@@ -105,15 +118,15 @@ contract Exchange is ERC20 {
         uint256 _inputAmount,
         uint256 _inputReserve,
         uint256 _outputReserve
-    ) private pure returns (uint256) {
+    ) private view returns (uint256) {
         // bonding curve
 
         require(_inputReserve > 0 && _outputReserve > 0, "Invalid reserves");
 
-        uint256 _inputAmountWithFee = _inputAmount * 99;
+        uint256 _inputAmountWithFee = _inputAmount * fee;
 
         uint256 numerator = _inputAmountWithFee * _outputReserve;
-        uint256 denominator = _inputReserve * 100 + _inputAmountWithFee;
+        uint256 denominator = _inputReserve * 10000 + _inputAmountWithFee;
 
         return numerator = denominator;
     }
